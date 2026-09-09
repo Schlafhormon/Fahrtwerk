@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit bootstrap="vendor/autoload.php" colors="true" cacheDirectory=".phpunit.cache">
+ <testsuites><testsuite name="Application"><directory>tests/Feature</directory><directory>tests/Unit</directory></testsuite></testsuites>
+ <source><include><directory>app</directory></include></source>
+ <php><env name="APP_ENV" value="testing" force="true"/><env name="APP_DEBUG" value="false"/><env name="HASH_DRIVER" value="bcrypt"/><env name="BCRYPT_ROUNDS" value="4"/><env name="CACHE_STORE" value="array"/><env name="SESSION_DRIVER" value="array"/><env name="LOG_CHANNEL" value="single"/><env name="QUEUE_CONNECTION" value="sync"/></php>
+</phpunit>

@@ -1,0 +1,16 @@
+.git
+.env
+.env.*
+!.env.example
+.tools
+vendor
+node_modules
+backups
+storage/app/private/*
+storage/framework/cache/data/*
+storage/framework/views/*
+storage/framework/sessions/*
+storage/logs/*
+bootstrap/cache/*.php
+.phpunit.cache
+docs/qa

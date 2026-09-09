@@ -1,0 +1,28 @@
+name: Application validation
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate and test PostgreSQL application
+        run: docker compose -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from test
+      - name: Build production images and verify health
+        run: |
+          cp .env.example .env
+          docker compose up -d --build --wait --wait-timeout 240
+          curl --fail http://127.0.0.1:8080/health
+          curl --fail http://127.0.0.1:8080/anmelden > /dev/null
+          docker compose exec -T app php artisan migrate:status
+      - name: Container diagnostics
+        if: always()
+        run: |
+          docker compose ps
+          docker compose logs --tail=80
+      - name: Stop stacks
+        if: always()
+        run: |
+          docker compose down -v
+          docker compose -f docker-compose.test.yml down -v

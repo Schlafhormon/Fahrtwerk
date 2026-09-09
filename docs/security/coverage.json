@@ -1,0 +1,123 @@
+{
+  "completeness": "partial",
+  "deferred": [],
+  "documentType": "codex-security.coverage",
+  "excludePaths": [],
+  "explicitExclusions": [
+    {
+      "pattern": "vendor/**",
+      "reason": "Third-party code excluded from full review; dependency audit and targeted OpenSpout call-site behavior checked."
+    },
+    {
+      "pattern": "node_modules/**",
+      "reason": "Development browser-test dependencies; npm advisory audit performed."
+    },
+    {
+      "pattern": ".tools/**",
+      "reason": "Local runtime binaries, test artifacts and transient private files."
+    },
+    {
+      "pattern": ".env*",
+      "reason": "Actual secret configuration excluded; .env.example reviewed."
+    },
+    {
+      "pattern": "storage/**",
+      "reason": "Runtime sessions, logs and private data excluded; first-party storage protection code reviewed."
+    },
+    {
+      "pattern": "vendor/**",
+      "reason": "Third-party code excluded from first-party audit; Composer advisory audit used."
+    },
+    {
+      "pattern": ".tools/**",
+      "reason": "Local runtime tools and secrets, not product source."
+    }
+  ],
+  "includePaths": [
+    "."
+  ],
+  "inventoryStrategy": "directory",
+  "mode": "repository",
+  "openQuestions": [
+    {
+      "question": "Docker Engine is unavailable. Complete container build, healthcheck and backup/restore validation on a Docker-capable host before production release."
+    },
+    {
+      "question": "Host HTTPS termination, backup retention and trusted-proxy IPs depend on the installation; README defines configuration."
+    }
+  ],
+  "scanId": "47bd1bd4-5f34-4778-a2f5-a0e646fa63bd",
+  "schemaVersion": "1.0",
+  "surfaces": [
+    {
+      "disposition": "rejected",
+      "id": "surface_authentication-forced-password-changes-account-reset-and-session-revocation",
+      "label": "Authentication, forced password changes, account reset and session revocation",
+      "notes": "Development candidate baseline-auth-001 fixed: fresh user row is locked, current hash and auth_version are rechecked during password change. Independent rereview and regression test pass. Argon2id, rate limits, active check and regenerated sessions reviewed.",
+      "receiptRefs": []
+    },
+    {
+      "disposition": "no_issue_found",
+      "id": "surface_server-side-employee-ownership-administrator-roles-and-reference-ids",
+      "label": "Server-side employee ownership, administrator roles and reference IDs",
+      "notes": "Policies, scoped queries, controller guards, input allowlists and filters reviewed across trips, vehicles, templates, profiles, settlements, reports and exports. IDOR/BOLA and admin-denial tests pass, including manipulated IDs and export filters.",
+      "receiptRefs": []
+    },
+    {
+      "disposition": "rejected",
+      "id": "surface_historical-financial-records-and-rate-relevant-vehicle-changes",
+      "label": "Historical financial records and rate-relevant vehicle changes",
+      "notes": "Development candidate baseline-history-001 fixed in controller and PostgreSQL trigger: history-bearing vehicle fields immutable except active/default metadata. Rules and approved snapshots immutable; exact scaled-integer financial calculations, transactions and regression tests reviewed.",
+      "receiptRefs": []
+    },
+    {
+      "disposition": "rejected",
+      "id": "surface_csv/xlsx/pdf-export-and-spreadsheet-formula-interpretation",
+      "label": "CSV/XLSX/PDF export and spreadsheet formula interpretation",
+      "notes": "Development XLSX formula issue fixed by explicit StringCell values. Actual ZIP worksheet XML regression confirms no formula elements. CSV formula neutralization, output scoping and escaped PDF snapshot view reviewed; remote PDF fetching disabled.",
+      "receiptRefs": []
+    },
+    {
+      "disposition": "no_issue_found",
+      "id": "surface_historical-csv-import-and-logo-upload",
+      "label": "Historical CSV import and logo upload",
+      "notes": "Admin-only private staged upload, preview/mapping/validation and transaction rollback reviewed. File limits, private paths, PNG re-encoding, no SVG and private-resource authorization inspected; atomic import tests pass.",
+      "receiptRefs": []
+    },
+    {
+      "disposition": "no_issue_found",
+      "id": "surface_trip-and-settlement-workflows-concurrency-and-audit",
+      "label": "Trip and settlement workflows, concurrency and audit",
+      "notes": "Status transitions, ownership locks, complete submission validation, odometer consistency, overlaps, decimal equality and correction reasons checked. Audit excludes credentials, PostgreSQL guards historical mutations; native tests pass.",
+      "receiptRefs": []
+    },
+    {
+      "disposition": "no_issue_found",
+      "id": "surface_browser-requests-templates-error-reporting-and-technical-logs",
+      "label": "Browser requests, templates, error reporting and technical logs",
+      "notes": "Blade escaping, CSRF default middleware, request allowlists, no unsafe raw user HTML, no secret payload logging; HttpOnly/SameSite and actual HTTP CSRF419 confirmed in browser. German error responses do not show internal details.",
+      "receiptRefs": []
+    },
+    {
+      "disposition": "needs_follow_up",
+      "id": "surface_production-container-and-backup-runtime-boundaries",
+      "label": "Production container and backup runtime boundaries",
+      "notes": "Docker/Compose/Nginx/FPM/entrypoint/scheduler/backup/restore source reviewed; db unpublished, secrets generated in volumes, app non-root, healthchecks and restart defined. Native pg_dump/pg_restore verified, Compose config validated. Missing Docker daemon prevents image/volume/container runtime validation.",
+      "receiptRefs": []
+    },
+    {
+      "disposition": "rejected",
+      "id": "auth",
+      "label": "Authentication and credential reset",
+      "notes": "Candidate baseline-auth-001 CWE-362 remediated in AuthController password transaction. Independent verification and regression pass.",
+      "receiptRefs": []
+    },
+    {
+      "disposition": "rejected",
+      "id": "history",
+      "label": "Submitted vehicle metadata and history",
+      "notes": "Candidate baseline-history-001 CWE-841 remediated by locked VehicleController and PostgreSQL vehicle-history trigger. Independent verification and regression pass.",
+      "receiptRefs": []
+    }
+  ]
+}

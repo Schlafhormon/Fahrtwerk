@@ -1,0 +1,31 @@
+name: fahrtwerk-test
+services:
+  test-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: fahrtwerk_test
+      POSTGRES_USER: fahrtwerk_test
+      # Flüchtige isolierte Test-DB, kein veröffentlichtes Port.
+      POSTGRES_HOST_AUTH_METHOD: trust
+    tmpfs: /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "fahrtwerk_test"]
+      interval: 2s
+      retries: 30
+  test:
+    build:
+      context: .
+      target: test
+    environment:
+      APP_ENV: testing
+      DB_CONNECTION: pgsql
+      DB_HOST: test-db
+      DB_PORT: 5432
+      DB_DATABASE: fahrtwerk_test
+      DB_USERNAME: fahrtwerk_test
+      DB_PASSWORD: ""
+      SESSION_DRIVER: array
+      CACHE_STORE: array
+    depends_on:
+      test-db:
+        condition: service_healthy

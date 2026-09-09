@@ -1,0 +1,97 @@
+name: fahrtwerk
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-fahrtwerk}
+      POSTGRES_USER: ${DB_USERNAME:-fahrtwerk}
+      FAHRTWERK_DB_PASSWORD: ${DB_PASSWORD:-}
+      POSTGRES_PASSWORD_FILE: /run/fahrtwerk/db_password
+      TZ: ${APP_TIMEZONE:-Europe/Berlin}
+    entrypoint: ["/bin/sh", "/opt/fahrtwerk/postgres-entrypoint.sh"]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - secrets:/run/fahrtwerk
+      - ./docker/postgres-entrypoint.sh:/opt/fahrtwerk/postgres-entrypoint.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+    networks: [internal]
+    # Kein veröffentlichter Datenbankport.
+  app:
+    build:
+      context: .
+      target: app
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_CONNECTION: pgsql
+      DB_PASSWORD_FILE: /run/fahrtwerk/db_password
+      TZ: ${APP_TIMEZONE:-Europe/Berlin}
+    volumes:
+      - app_storage:/var/www/html/storage
+      - secrets:/run/fahrtwerk:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/var/www/html/docker/fpm-health.sh"]
+      interval: 15s
+      timeout: 10s
+      start_period: 60s
+      retries: 5
+    security_opt: ["no-new-privileges:true"]
+    networks: [internal]
+  web:
+    build:
+      context: .
+      target: web
+    restart: unless-stopped
+    ports:
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-8080}:80"
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    security_opt: ["no-new-privileges:true"]
+    networks: [internal]
+  scheduler:
+    # Gleicher Monolith / gleiches Image; führt nur Laravel-Wartungsaufgaben aus.
+    build:
+      context: .
+      target: app
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_CONNECTION: pgsql
+      DB_PASSWORD_FILE: /run/fahrtwerk/db_password
+      TZ: ${APP_TIMEZONE:-Europe/Berlin}
+    entrypoint: ["php", "artisan", "schedule:work", "--no-interaction"]
+    volumes:
+      - app_storage:/var/www/html/storage
+      - secrets:/run/fahrtwerk:ro
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "php -r 'exit(is_file(\"storage/framework/scheduler-heartbeat\") && time()-filemtime(\"storage/framework/scheduler-heartbeat\")<180 ? 0 : 1);'"]
+      interval: 60s
+      start_period: 120s
+      timeout: 5s
+      retries: 3
+    security_opt: ["no-new-privileges:true"]
+    networks: [internal]
+volumes:
+  postgres_data:
+  app_storage:
+  secrets:
+networks:
+  internal:
+    driver: bridge

@@ -1,0 +1,2 @@
+username;plate;starts_at;ends_at;route;destination;purpose;odometer_start;odometer_end;business_km;commute_km;private_km;note;correction_reason
+m.mustermann;M-AB 123;2026-08-03 08:00:00;2026-08-03 09:00:00;Rathaus - Bauhof - Rathaus;Bauhof;Dienstbesprechung;10000.00;10030.00;30.00;0.00;0.00;Historische Fahrt;
