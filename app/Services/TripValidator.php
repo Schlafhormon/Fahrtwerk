@@ -12,15 +12,30 @@ class TripValidator
     public function validate(array $data, Vehicle $vehicle, ?Trip $trip = null, bool $complete = false): array
     {
         $required = $complete ? 'required' : 'nullable';
-        $rules = ['starts_at' => [$required, 'date'], 'ends_at' => [$required, 'date', 'after_or_equal:starts_at'], 'route' => [$required, 'string', 'max:2000'], 'destination' => [$required, 'string', 'max:255'], 'purpose' => [$required, 'string', 'max:2000'], 'note' => ['nullable', 'string', 'max:4000'], 'correction_reason' => ['nullable', 'string', 'max:2000']];
+        $rules = ['starts_at' => [$required, 'date'], 'ends_at' => [$required, 'date', 'after_or_equal:starts_at'], 'origin' => ['nullable', 'string', 'max:255'], 'route' => [$required, 'string', 'max:2000'], 'destination' => [$required, 'string', 'max:255'], 'purpose' => [$required, 'string', 'max:2000'], 'note' => ['nullable', 'string', 'max:4000'], 'correction_reason' => ['nullable', 'string', 'max:2000']];
         foreach (['odometer_start', 'odometer_end', 'business_km', 'commute_km', 'private_km'] as $f) {
-            $rules[$f] = [$required, 'numeric', 'min:0', 'max:99999999', 'regex:/^\d+(\.\d{1,2})?$/D'];
+            $rules[$f] = [str_starts_with($f, 'odometer_') ? 'nullable' : $required, 'numeric', 'min:0', 'max:99999999', 'regex:/^\d+(\.\d{1,2})?$/D'];
         }
         $v = Validator::make($data, $rules);
         $v->validate();
         $error = [];
         $flags = [];
         $has = fn ($f) => isset($data[$f]) && $data[$f] !== '';
+        if ($trip?->pair_id) {
+            $partner = $trip->pairedTrips()->where('id', '!=', $trip->id)->first();
+            if ($partner) {
+                $outboundEnd = $trip->direction === 'outbound' ? ($data['ends_at'] ?? null) : $partner->ends_at?->format('Y-m-d H:i:s');
+                $returnStart = $trip->direction === 'return' ? ($data['starts_at'] ?? null) : $partner->starts_at?->format('Y-m-d H:i:s');
+                if ($outboundEnd && $returnStart && $returnStart < $outboundEnd) {
+                    $error['starts_at'] = 'Die Rückfahrt darf erst nach dem Ende der Hinfahrt beginnen.';
+                }
+                if ($complete && (! $partner->starts_at || ! $partner->ends_at)) {
+                    $error['pair'] = 'Bitte die tatsächlichen Uhrzeiten beider zusammengehörigen Fahrten ergänzen.';
+                } elseif ($complete && Validator::make($partner->getAttributes(), $rules)->fails()) {
+                    $error['pair'] = 'Bitte die Pflichtdaten beider zusammengehörigen Fahrten vervollständigen.';
+                }
+            }
+        }
         if ($has('odometer_start') && $has('odometer_end')) {
             $diff = Decimal::scaled($data['odometer_end']) - Decimal::scaled($data['odometer_start']);
             if ($diff < 0) {
@@ -46,10 +61,10 @@ class TripValidator
                     $error['starts_at'] = 'Diese Fahrt überschneidet sich mit einer anderen Fahrt der Person oder des Fahrzeugs.';
                 }
             }
-            $previous = Trip::where('vehicle_id', $vehicle->id)->where('id', '!=', $trip?->id ?? 0)->where('starts_at', '<', $data['starts_at'])->whereNotNull('odometer_end')->orderByDesc('starts_at')->first();
-            $next = Trip::where('vehicle_id', $vehicle->id)->where('id', '!=', $trip?->id ?? 0)->where('starts_at', '>', $data['starts_at'])->whereNotNull('odometer_start')->orderBy('starts_at')->first();
-            $expected = $previous?->odometer_end ?? $vehicle->initial_odometer;
-            $jump = ($has('odometer_start') && $expected !== null && Decimal::scaled($data['odometer_start']) !== Decimal::scaled($expected)) || ($has('odometer_end') && $next && Decimal::scaled($data['odometer_end']) !== Decimal::scaled($next->odometer_start));
+            $previous = Trip::where('vehicle_id', $vehicle->id)->where('id', '!=', $trip?->id ?? 0)->where('starts_at', '<', $data['starts_at'])->orderByDesc('starts_at')->orderByDesc('id')->first();
+            $next = Trip::where('vehicle_id', $vehicle->id)->where('id', '!=', $trip?->id ?? 0)->where('starts_at', '>', $data['starts_at'])->orderBy('starts_at')->orderBy('id')->first();
+            $expected = $previous ? $previous->odometer_end : $vehicle->initial_odometer;
+            $jump = ($has('odometer_start') && $expected !== null && Decimal::scaled($data['odometer_start']) !== Decimal::scaled($expected)) || ($has('odometer_end') && $next?->odometer_start !== null && Decimal::scaled($data['odometer_end']) !== Decimal::scaled($next->odometer_start));
             if ($jump) {
                 $flags[] = 'Kilometerstandsprung';
                 if (app(Settings::class)->get('enforce_odometer_continuity') && empty($data['correction_reason'])) {
@@ -58,7 +73,7 @@ class TripValidator
             }
         }
         if (! $complete) {
-            foreach (['starts_at', 'ends_at', 'route', 'destination', 'purpose', 'odometer_start', 'odometer_end', 'business_km', 'commute_km', 'private_km'] as $f) {
+            foreach (['starts_at', 'ends_at', 'route', 'destination', 'purpose', 'business_km', 'commute_km', 'private_km'] as $f) {
                 if (! $has($f)) {
                     $flags[] = 'Fehlende Pflichtdaten';
                     break;

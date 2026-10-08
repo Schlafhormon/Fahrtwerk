@@ -10,7 +10,7 @@ class TripQuery
 {
     public function query(User $user, array $filters = [])
     {
-        $q = Trip::query()->with(['user.organizationUnit', 'vehicle', 'settlement']);
+        $q = Trip::query()->with(['user.organizationUnit', 'vehicle', 'settlement', 'pairedTrips']);
         if (! $user->isAdmin()) {
             $q->where('user_id', $user->id);
         }

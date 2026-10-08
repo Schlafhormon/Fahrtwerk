@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Trip extends Model
 {
@@ -31,5 +32,10 @@ class Trip extends Model
     public function editable(): bool
     {
         return in_array($this->status, ['DRAFT', 'RETURNED']);
+    }
+
+    public function pairedTrips(): HasMany
+    {
+        return $this->hasMany(self::class, 'pair_id', 'pair_id');
     }
 }
