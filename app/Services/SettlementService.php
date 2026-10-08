@@ -63,7 +63,10 @@ class SettlementService
                 $total = 0;
                 foreach ($trips as $trip) {
                     app(TripValidator::class)->validate($trip->getAttributes(), $trip->vehicle, $trip, true);
-                    foreach (app(RateService::class)->positions($trip, true) as $position) {
+                }
+                $positions = app(RateService::class)->positionsForTrips($trips, true);
+                foreach ($trips as $trip) {
+                    foreach ($positions[$trip->id] as $position) {
                         $total += Decimal::scaled($position['amount']);
                         SettlementLine::create($position + ['settlement_id' => $s->id, 'trip_id' => $trip->id, 'trip_snapshot' => $trip->toArray(), 'calculated_at' => now()]);
                     }

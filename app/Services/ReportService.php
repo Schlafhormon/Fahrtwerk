@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Period;
 use App\Models\SettlementLine;
 use App\Models\User;
 
@@ -10,6 +11,17 @@ class ReportService
     public function build(User $user, array $filters): array
     {
         $q = app(TripQuery::class)->query($user, $filters);
+        $contextFilters = array_intersect_key($filters, array_flip(['user_id', 'organization_unit_id', 'from', 'to']));
+        if (! empty($contextFilters['from'])) {
+            $period = Period::where('starts_on', '<=', $contextFilters['from'])->where('ends_on', '>=', $contextFilters['from'])->first();
+            $contextFilters['from'] = $period?->starts_on->toDateString() ?? $contextFilters['from'];
+        }
+        if (! empty($contextFilters['to'])) {
+            $period = Period::where('starts_on', '<=', $contextFilters['to'])->where('ends_on', '>=', $contextFilters['to'])->first();
+            $contextFilters['to'] = $period?->ends_on->toDateString() ?? $contextFilters['to'];
+        }
+        $pendingTrips = app(TripQuery::class)->query($user, $contextFilters)->whereIn('status', ['DRAFT', 'RETURNED', 'SUBMITTED'])->orderBy('id')->lazyById(250);
+        $estimates = app(RateService::class)->positionsForTrips($pendingTrips);
         $result = ['count' => 0, 'total' => 0, 'business' => 0, 'commute' => 0, 'private' => 0, 'cost' => 0, 'unpriced' => 0, 'months' => [], 'years' => [], 'vehicles' => [], 'people' => [], 'units' => [], 'destinations' => [], 'purposes' => []];
         foreach ($q->orderBy('id')->lazyById(250) as $trip) {
             $result['count']++;
@@ -23,7 +35,7 @@ class ReportService
             if ($lines->isNotEmpty()) {
                 $cost = Decimal::scaled(Decimal::sum($lines->pluck('amount')));
             } elseif ($trip->starts_at) {
-                $positions = app(RateService::class)->positions($trip);
+                $positions = $estimates[$trip->id] ?? [];
                 $cost = Decimal::scaled(Decimal::sum(array_column($positions, 'amount')));
                 foreach ($positions as $p) {
                     if ($p['category'] === 'business' && ! $p['reimbursement_rule_id']) {

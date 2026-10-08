@@ -43,7 +43,7 @@ class SettlementController extends Controller
     public function show(Settlement $settlement)
     {
         Gate::authorize('view', $settlement);
-        $settlement->load(['user', 'period']);
+        $settlement->load(['user', 'period', 'lines']);
         $trips = $settlement->trips()->with('vehicle')->orderBy('starts_at')->paginate(50);
 
         return view('settlements.show', compact('settlement', 'trips'));
