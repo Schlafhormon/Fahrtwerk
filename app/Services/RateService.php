@@ -43,6 +43,7 @@ class RateService
 
     /**
      * Aggregate rounding groups trips by employee, period and rule version.
+     * Journey rounding groups the two directions independently of the period.
      * Deduct fractional kilometers from the last positions and allocate cents
      * cumulatively so the positions add up to the rounded group amount.
      *
@@ -54,20 +55,24 @@ class RateService
         $periods = Period::orderBy('starts_on')->get();
         $positions = [];
         $groups = [];
-        $orderedTrips = collect($trips)->sort(fn (Trip $left, Trip $right): int => [$left->starts_at?->timestamp ?? 0, $left->id] <=> [$right->starts_at?->timestamp ?? 0, $right->id]);
+        $requestedTrips = collect($trips)->keyBy('id');
+        $pairIds = $requestedTrips->pluck('pair_id')->filter()->unique();
+        $companions = $pairIds->isEmpty() ? collect() : Trip::with('vehicle')->whereIn('pair_id', $pairIds)->get();
+        $orderedTrips = $requestedTrips->union($companions->keyBy('id'))->sort(fn (Trip $left, Trip $right): int => [$left->starts_at?->timestamp ?? 0, $left->id] <=> [$right->starts_at?->timestamp ?? 0, $right->id]);
         foreach ($orderedTrips as $trip) {
             if (! $trip->starts_at) {
                 continue;
             }
-            $positions[$trip->id] = $this->positions($trip, $strict);
+            $positions[$trip->id] = $this->positions($trip, $strict && $requestedTrips->has($trip->id));
             $date = $trip->starts_at->toDateString();
             $period = $periods->first(fn (Period $period): bool => $period->starts_on->toDateString() <= $date && $period->ends_on->toDateString() >= $date);
             foreach ($positions[$trip->id] as $index => $position) {
-                if ($position['kilometer_rounding'] !== 'aggregate') {
+                $journey = $position['kilometer_rounding'] === 'journey';
+                if (! $journey && ($position['kilometer_rounding'] !== 'aggregate' || ! $requestedTrips->has($trip->id))) {
                     continue;
                 }
-                $scope = $period ? 'period:'.$period->id : 'trip:'.$trip->id;
-                $key = $trip->user_id.':'.$scope.':'.$position['reimbursement_rule_id'].':'.$position['category'];
+                $scope = $journey ? 'journey:'.($trip->pair_id ?? 'trip:'.$trip->id) : ($period ? 'period:'.$period->id : 'trip:'.$trip->id);
+                $key = $trip->user_id.':'.$scope.':'.($journey ? '' : $position['reimbursement_rule_id']).':'.$position['category'];
                 $groups[$key] ??= ['kilometers' => 0, 'members' => []];
                 $groups[$key]['kilometers'] += Decimal::scaled($position['kilometers']);
                 $groups[$key]['members'][] = [$trip->id, $index];
@@ -81,17 +86,18 @@ class RateService
                 $positions[$tripId][$index]['billable_kilometers'] = Decimal::format($kilometers - $deduction);
                 $remainingDeduction -= $deduction;
             }
-            $cumulativeKilometers = 0;
-            $cumulativeAmount = 0;
+            $cumulativeKilometers = [];
+            $cumulativeAmount = [];
             foreach ($group['members'] as [$tripId, $index]) {
                 $position = $positions[$tripId][$index];
-                $cumulativeKilometers += Decimal::scaled($position['billable_kilometers']);
-                $amount = Decimal::scaled(Decimal::amount(Decimal::format($cumulativeKilometers), $position['rate']));
-                $positions[$tripId][$index]['amount'] = Decimal::format($amount - $cumulativeAmount);
-                $cumulativeAmount = $amount;
+                $rate = $position['rate'];
+                $cumulativeKilometers[$rate] = ($cumulativeKilometers[$rate] ?? 0) + Decimal::scaled($position['billable_kilometers']);
+                $amount = Decimal::scaled(Decimal::amount(Decimal::format($cumulativeKilometers[$rate]), $rate));
+                $positions[$tripId][$index]['amount'] = Decimal::format($amount - ($cumulativeAmount[$rate] ?? 0));
+                $cumulativeAmount[$rate] = $amount;
             }
         }
 
-        return $positions;
+        return array_intersect_key($positions, $requestedTrips->all());
     }
 }

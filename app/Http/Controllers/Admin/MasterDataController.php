@@ -38,7 +38,7 @@ class MasterDataController extends Controller
     public function rule(Request $r)
     {
         $d = $r->validate(['name' => 'required|string|max:150', 'category' => 'required|in:business,commute,private', 'vehicle_type' => 'nullable|in:Privatfahrzeug,Dienstfahrzeug,Poolfahrzeug', 'rate' => 'required|numeric|min:0|max:100|decimal:0,4', 'valid_from' => 'required|date_format:Y-m-d', 'valid_until' => 'nullable|date_format:Y-m-d|after_or_equal:valid_from', 'description' => 'nullable|string|max:2000', 'predecessor_id' => 'nullable|exists:reimbursement_rules,id']);
-        $d['kilometer_rounding'] = $r->validate(['kilometer_rounding' => ['sometimes', 'required', Rule::in(array_keys(ReimbursementRule::kilometerRoundingOptions()))]])['kilometer_rounding'] ?? 'exact';
+        $d['kilometer_rounding'] = $r->validate(['kilometer_rounding' => ['sometimes', 'required', Rule::in(array_keys(ReimbursementRule::kilometerRoundingOptions()))]])['kilometer_rounding'] ?? ($d['category'] === 'business' ? 'journey' : 'exact');
         DB::transaction(function () use ($r, $d) {
             app(Settings::class)->lock();
             $prev = ! empty($d['predecessor_id']) ? ReimbursementRule::findOrFail($d['predecessor_id']) : null;

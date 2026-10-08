@@ -31,7 +31,7 @@ class KilometerRoundingTest extends TestCase
     /** @return array<string, array{?string, string}> */
     public static function ruleModes(): array
     {
-        return ['unchanged' => ['exact', 'exact'], 'per trip' => ['per_trip', 'per_trip'], 'sum' => ['aggregate', 'aggregate'], 'omitted for compatibility' => [null, 'exact']];
+        return ['unchanged' => ['exact', 'exact'], 'per trip' => ['per_trip', 'per_trip'], 'sum' => ['aggregate', 'aggregate'], 'journey' => ['journey', 'journey'], 'omitted uses journey default' => [null, 'journey']];
     }
 
     #[DataProvider('ruleModes')]

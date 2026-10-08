@@ -11,7 +11,7 @@ class ReimbursementRule extends Model
     /** @return array<string, string> */
     public static function kilometerRoundingOptions(): array
     {
-        return ['exact' => 'Unverändert', 'per_trip' => 'Abrunden je Fahrt', 'aggregate' => 'Summe abrunden'];
+        return ['journey' => 'Dienstreise abrunden', 'exact' => 'Unverändert', 'per_trip' => 'Abrunden je Fahrt', 'aggregate' => 'Summe abrunden'];
     }
 
     protected function casts(): array
